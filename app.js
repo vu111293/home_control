@@ -16,7 +16,7 @@ let express = require('express');
 let bodyParse = require('body-parser');
 let admin = require("firebase-admin", conf.SERVER_KEY_PATH);
 let serviceAccount = require(conf.SERVER_KEY_PATH);
-
+let https = require("https");
 
 // sensor
 let temperature = 0;
@@ -124,6 +124,10 @@ const homeControlChecker = setInterval(() => {
         mServer.saveDTH(latestTemp, latestHumidity, (msg) => { console.log(msg); });
     }
 }, 1 * 60 * 1000);
+
+setInterval(function () {
+    https.get("https://home-control-2018.herokuapp.com");
+}, 300000); // every 5 minutes (300000)
 
 
 admin.initializeApp({

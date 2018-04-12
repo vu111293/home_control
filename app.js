@@ -100,8 +100,8 @@ client.on('message', function (topic, message) {
 })
 
 
-const deltaChange = 0.5;
-const INTERVAL_PUSH = 15 * 60 * 1000;
+const deltaChange = 0.3;
+const INTERVAL_PUSH = 5 * 60 * 1000;
 
 var currentIntervalPush = 0;
 const homeControlChecker = setInterval(() => {
@@ -147,6 +147,13 @@ var server = app.listen(app.get('port'), function () {
     console.log('App host %s', server.address().address);
     console.log('App listening on port %s', server.address().port);
     console.log('Press Ctrl+C to quit.');
+});
+
+app.post('/config', function (request, response) {
+    // let conf = JSON.parse(request.body);
+    console.log("-------> config");
+    console.log(request.body.name);
+    response.end("done");
 });
 
 app.post('/', function (request, response) {
@@ -215,293 +222,27 @@ app.post('/', function (request, response) {
     }
 
 
-    // Support methods
-    function createBill(agent, username) {
-        let items;
-        let cart = agent.getContext('shoppingcart');
-        if (cart && cart.parameters.items && cart.parameters.items.length > 0) {
-            items = cart.parameters.items;
-        } else {
-            agent.add('Giỏ hàng rỗng. Vui lòng chọn món');
-            return;
-        }
-
-        let totalPrice = 0;
-        var options = [];
-        for (let i in items) {
-            totalPrice += parseInt(items[i].price);
-        }
-
-        // create new bill in firebase database
-        let uid = uuidv4();
-        admin.database().ref('/buillstack/' + uid).set({
-            id: uid,
-            username: username,
-            orderlist: items,
-            created: moment.now()
-        });
-
-        let condition = "'marika-coffee' in topics";
-        // let topic = 'marika-coffee'
-        let message = {
-            notification: {
-                title: 'Hóa đơn mới',
-                body: 'Tổng hóa đơn ' + totalPrice + ' đồng.',
-            },
-            data: {
-                type: 'take-away',
-                orderId: uid,
-                // ,
-                // body: JSON.stringify(options)
-            },
-            condition: condition
-            // topic: topic
-        }
-        admin.messaging().send(message)
-            .then((response) => {
-                console.log('Successfully sent message:', response);
-            })
-            .catch((error) => {
-                console.log('Error sending message:', error);
-            });
-
-        agent.add('Yêu cầu của bạn đã được gửi đến Marika Cafe');
-        agent.add('Cảm ơn *' + username + '* đã sử dụng dịch vụ.')
-        agent.add('Xin vui lòng đợi phục vụ');
-    }
-
-    function addMultiToCart(agent, products) {
-        let speakout = [];
-        let cartcontext = agent.getContext('shoppingcart');
-        if (!cartcontext) {
-            cartcontext = {
-                name: 'shoppingcart',
-                lifespan: 50,
-                parameters: {
-                    items: []
-                }
-            }
-        }
-        let items = cartcontext.parameters.items;
-        if (!items) { items = []; }
-
-        for (let i in products) {
-            let item = products[i];
-            items.push({
-                'name': item.product.name,
-                'price': item.product.price,
-                'quantity': parseInt(item.quantity),
-                'options': item.options
-            });
-            speakout.push(util.format('x %s *%s* - %s', item.quantity, item.product.name, convTopping(item.options)));
-        }
-
-        cartcontext.parameters = { 'items': items };
-        agent.setContext(cartcontext);
-        agent.add('Đã thêm:');
-        for (let i in speakout) {
-            agent.add(new Text(util.format('• %s', speakout[i])));
-            // agent.add(new Suggestion(speakout[i]));
-        }
-        agent.add('Bạn có muốn chọn món kế tiếp?');
-        buildNextAction(agent, ["THANH TOÁN", "ĐIỀU CHỈNH", "HỦY ĐƠN HÀNG"]);
-        // agent.add('Gõ \"xem giỏ hàng\" để xem sản phẩm đã chọn');
-        // agent.add('Gõ \"thanh toán\" để gửi yêu cầu thanh toán');
-    }
-
-    function findGroupEvent(options) {
-        let found;
-        let event = 'askw-nonetopping-event';
-
-        if (!options) {
-            return event;
-        }
-        for (let i in TOPPING_MAP) {
-            found = true;
-            for (let j in TOPPING_MAP[i].topping) {
-                if (!options.includes(TOPPING_MAP[i].topping[j])) {
-                    found = false;
-                    break;
-                }
-            }
-            if (found) {
-                event = TOPPING_MAP[i].event;
-                break;
-            }
-        }
-        return event;
-    }
-
-    function viewCartOnly(agent) {
-        let cartcontext = agent.getContext('shoppingcart');
-        let ret = false;
-        let total = 0;
-        if (cartcontext != null && cartcontext.parameters.items != null) {
-            agent.add('Giỏ hàng hiện tại của bạn là:');
-            for (let i in cartcontext.parameters.items) {
-                let item = cartcontext.parameters.items[i];
-                agent.add(new Text(util.format('• %s x *%s*', item.quantity, item.name)));
-                total += parseInt(item.price * item.quantity);
-            }
-            ret = true;
-        }
-        agent.add('Tổng tộng *' + mDs.formatPrice(total) + '* đồng');
-        return ret;
-    }
-
-    function removeFromCart(agent, product) {
-        let mProduct = mDs.findDevice(product);
-        let found = false;
-        if (mProduct) {
-            let cartcontext = agent.getContext('shoppingcart');
-            if (cartcontext != null && cartcontext.parameters.items != null) {
-                let newItems = [];
-                for (let i in cartcontext.parameters.items) {
-                    let item = cartcontext.parameters.items[i];
-                    if (mProduct.name.includes(item.name)) {
-                        found = true;
-                    } else {
-                        newItems.push(item);
-                    }
-                }
-                cartcontext.parameters.items = newItems;
-            }
-            agent.setContext(cartcontext);
-        }
-        return found;
-    }
-
-    function addToCart(agent, product, quantity, options) {
-        let cartcontext = agent.getContext('shoppingcart');
-        if (!cartcontext) {
-            cartcontext = {
-                name: 'shoppingcart',
-                lifespan: 50,
-                parameters: {
-                    items: []
-                }
-            }
-        }
-
-        let items = cartcontext.parameters.items;
-        if (!items) { items = []; }
-        quantity = parseInt(quantity);
-        items.push({
-            'name': product.name,
-            'price': product.price,
-            'quantity': quantity,
-            'options': options
-        });
-        cartcontext.parameters = { 'items': items };
-        agent.setContext(cartcontext);
-        agent.add('Đã thêm:');
-        agent.add(new Text(util.format('• x%s *%s* - %s', quantity, product.name, convTopping(options))));
-        // agent.add(new Suggestion(util.format('x %s *%s* - %s', quantity, product.name, convTopping(options))));
-        agent.add('Bạn có muốn tiếp tục mua hàng?');
-        buildNextAction(agent, ["THANH TOÁN", "ĐIỀU CHỈNH", "HỦY ĐƠN HÀNG"]);
-        // agent.add('Gõ \"xem giỏ hàng\" để xem sản phẩm đã chọn');
-        // agent.add('Gõ \"thanh toán\" để gửi yêu cầu thanh toán');
-    }
-
-    function buildNextAction(agent, actions) {
-        for (let i in actions) {
-            agent.add(new Suggestion(actions[i]));
-        }
-    }
-
-    function convTopping(topping) {
-        let out = [];
-        if (topping) {
-            let added = false;
-            for (let k in topping) {
-                let item = '';
-                if (topping[k] == 'low') item = 'ít';
-                else if (topping[k] == 'high') item = 'nhiều';
-                else if (topping[k] == 'none') item = 'không';
-                else continue;
-
-                if (k == 'sugar') item += ' đường';
-                else if (k == 'milk') item += ' sữa';
-                else item += 'thing';
-                out.push(item);
-                added = true;
-            }
-            if (!added) {
-                out.push('bình thường');
-            }
-        } else {
-            out.push('bình thường');
-        }
-
-        return out.join(', ');
-    }
-
-    function handleSingleItemWithTopping(product, quantity, topping) {
-        let parameters = {
-            'product': product.name,
-        };
-        if (quantity > 0) {
-            parameters.quantity = quantity;
-        }
-        // for (let i in topping) {
-        //     let sp = topping[i].split('-');
-        //     if (sp.length == 2) {
-        //         parameters[sp[0]] = sp[1];
-        //     }
-        // }
-
-        if (topping) {
-            for (let k in topping) {
-                parameters[k] = topping[k];
-            }
-        }
-
-        let event = findGroupEvent(product.options);
-        if (event) {
-            agent.setFollowupEvent({
-                name: event,
-                parameters: parameters
-            });
-        } else {
-            agent.add('Hiện tại không bán ' + product);
-        }
-    }
-
-
-    function viewCart(agent) {
-        let cart = agent.getContext('shoppingcart');
-        if (!cart || !cart.parameters.items || cart.parameters.items.length == 0) {
-            agent.add('Giỏ hàng rỗng. Xin mời bạn chọn món');
-            mDs.buildRichCategories(agent);
-            return;
-        }
-
-        agent.add('Hiện tại bạn có:')
-        let total = 0;
-        for (let i in cart.parameters.items) {
-            let item = cart.parameters.items[i];
-            // agent.add(new Suggestion(util.format('x%s *%s* - %s', parseInt(item.quantity), item.name, convTopping(item.options))));
-            agent.add(new Text(util.format('• x%s *%s* - %s', parseInt(item.quantity), item.name, convTopping(item.options))));
-            total += parseInt(item.price * item.quantity);
-        }
-
-        agent.add('Tổng tộng *' + mDs.formatPrice(total) + '* đồng');
-        agent.add('Bạn có muốn tiếp tục mua hàng?');
-        buildNextAction(agent, ["THANH TOÁN", "ĐIỀU CHỈNH", "HỦY ĐƠN HÀNG"]);
-    }
-
-
-    function turnDevice(device, action) {
-
-    }
-
     // HOME CONTROL methods
-    function deviceTurnOffReqeust(agent) {
+    function deviceTurnOffRequest(agent) {
+        deviceTurnAction(agent, {
+            type: 'off',
+            value: '0'
+        });
+    }
+
+    function deviceTurnOnRequest(agent) {
+        deviceTurnAction(agent, {
+            type: 'on',
+            value: '1'
+        });
+    }
+
+    function deviceTurnAction(agent, action) {
         let device = agent.parameters['device'];
         if (device) {
             let mDevice = mDs.findDevice(device);
             if (mDevice) {
-                mDevice
+                turnDevice(agent, mDevice, action);
             } else {
                 agent.add('Không tìm thấy thiết bị ' + device + '. Vui lòng thử với thiết bị khác');
             }
@@ -510,15 +251,37 @@ app.post('/', function (request, response) {
         }
     }
 
+    function turnDevice(agent, device, action) {
+        client.publish(device.topic, action.value, { qos: 2 }, (err, pack) => {
+        });
+        agent.add('Đã ' + convAction(action.type) + ' ' + device.name);
+    }
+
+    function convAction(action) {
+        let out = '';
+        switch (action) {
+            case 'off': out = 'tắt';
+                break;
+
+            case 'on': out = 'mở';
+                break;
+
+            default:
+                break;
+        }
+        return out;
+    }
+
     // Run the proper handler based on the matched Dialogflow intent
     let intentMap = new Map();
     intentMap.set('Default Welcome Intent', welcome);
     intentMap.set('Default Fallback Intent', fallback);
-    intentMap.set('ask-product-order', askProducForOrder);
-    intentMap.set('device-turnoff-request', deviceTurnOffReqeust);
+    // intentMap.set('ask-product-order', askProducForOrder);
+    intentMap.set('device-turnoff-request', deviceTurnOffRequest);
+    intentMap.set('device-turnon-request', deviceTurnOnRequest);
 
     // help handler
-    intentMap.set('help-request', helpRequest);
+    // intentMap.set('help-request', helpRequest);
 
     if (agent.requestSource === agent.ACTIONS_ON_GOOGLE) {
         intentMap.set(null, googleAssistantOther);

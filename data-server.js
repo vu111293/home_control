@@ -1,5 +1,6 @@
 const { Card, Suggestion, Image, Text, Payload } = require('dialogflow-fulfillment');
 const util = require('util');
+let accents = require('remove-accents');
 
 const MARIKA_HOMEPAGE_URL = 'http://marika.cafe/';
 const SLACK_SUPPORT = true;
@@ -37,13 +38,13 @@ class DataServer {
 
         for (let key in this.devices) {
             let item = this.devices[key];
-            if (item.replacename == null) {
+            if (item.replacenames == null) {
                 continue;
             }
-            name = name.toLowerCase();
-            let nameList = item.replacename.split(',');
+            name = accents.remove(name.toLowerCase());
+            let nameList = item.replacenames.split(',');
             for (let index in nameList) {
-                let name = nameList[index];
+                let name = accents.remove(nameList[index]);
                 if (name.includes(name) == false) {
                     continue;
                 }

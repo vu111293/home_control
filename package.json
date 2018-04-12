@@ -25,6 +25,7 @@
         "moment": "^2.22.0",
         "dialogflow-fulfillment": "0.3.0-beta.1",
         "firebase-functions": "^0.5.7",
-        "mqtt": "^2.17.0"
+        "mqtt": "^2.17.0",
+        "remove-accents": "^0.4.2"
     }
 }

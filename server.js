@@ -6,7 +6,7 @@ const { Card, Suggestion, Image, Text, Payload } = require('dialogflow-fulfillme
 const util = require('util');
 
 const MARIKA_HOMEPAGE_URL = 'http://marika.cafe/';
-const HOMECONTROL_SHEET_URL = 'https://script.google.com/macros/s/AKfycbw23Wwvdxzyr8EEneWOwqFytcO-6VbO3B-xt2G7KrU_niRUwG4/exec?action=home_control';
+const HOMECONTROL_SHEET_URL = 'https://script.google.com/macros/s/AKfycbwVepWQTGpxwOWU7r1_u7pARVQmgHJgGG1f1fsdEH0SQPQF58g/exec?action=home_control';
 const SLACK_SUPPORT = true;
 
 class Server {

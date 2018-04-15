@@ -83,7 +83,6 @@ client.on('connect', function () {
 client.on('message', function (topic, message) {
     // message is Buffer
     console.log(topic + " ->" + message.toString())
-
     switch (topic) {
         case 'house/sensor/temperature':
             temperature = parseFloat(message);
@@ -100,30 +99,32 @@ client.on('message', function (topic, message) {
 })
 
 
-const deltaChange = 0.3;
-const INTERVAL_PUSH = 5 * 60 * 1000;
+let mDeltaChanged = 0.3;
+let mIntervalPush = 5 * 60 * 1000;
+let mIntervalCheck = 60 * 1000;
+var currentIntervalPush = moment();
 
-var currentIntervalPush = 0;
-const homeControlChecker = setInterval(() => {
-
+const monitorHandler = () => {
+    console.log('check ....');
     let changed = false;
-    if (Math.abs(latestTemp - temperature) > deltaChange) {
+    if (Math.abs(latestTemp - temperature) > mDeltaChanged) {
         latestTemp = temperature;
         changed = true;
     }
 
-    if (Math.abs(latestHumidity - humidity) > deltaChange) {
+    if (Math.abs(latestHumidity - humidity) > mDeltaChanged) {
         latestHumidity = humidity;
         changed = true;
     }
 
-    if (changed == true || currentIntervalPush + INTERVAL_PUSH > moment()) {
-        if (currentIntervalPush + INTERVAL_PUSH > moment()) {
+    if (changed == true || currentIntervalPush + mIntervalPush < moment()) {
+        if (currentIntervalPush + mIntervalPush < moment()) {
             currentIntervalPush = moment();
         }
         mServer.saveDTH(latestTemp, latestHumidity, (msg) => { console.log(msg); });
     }
-}, 1 * 60 * 1000);
+};
+let mSensorIntervalId = setInterval(monitorHandler, mIntervalCheck);
 
 setInterval(function () {
     https.get("https://home-control-2018.herokuapp.com");
@@ -149,11 +150,51 @@ var server = app.listen(app.get('port'), function () {
     console.log('Press Ctrl+C to quit.');
 });
 
+
+app.get('/config', function (request, response) {
+    response.status(200).send({
+        'checkInterval': mIntervalCheck,
+        'pushInterval': mIntervalPush,
+        'deltaChanged': mDeltaChanged
+    });
+});
+
+app.post('/stopUpdate', function (request, response) {
+    console.log('request stop updated');
+    try {
+        clearInterval(mSensorIntervalId);
+        response.status(200);
+        response.send('Ok');
+    } catch (error) {
+        response.status(300);
+        response.send('Error: ' + error.message);
+    }
+});
+
 app.post('/config', function (request, response) {
-    // let conf = JSON.parse(request.body);
-    console.log("-------> config");
-    console.log(request.body.name);
-    response.end("done");
+    console.log("check interval: " + request.body.checkInterval);
+    console.log("push interval: " + request.body.pushInterval);
+    console.log("delta changed: " + request.body.deltaChanged);
+
+    try {
+        let check = parseInt(request.body.checkInterval);
+        let push = parseInt(request.body.pushInterval);
+        let delta = parseFloat(request.body.deltaChanged);
+
+        mIntervalCheck = check;
+        mIntervalPush = push;
+        mDeltaChanged = delta;
+
+        clearInterval(mSensorIntervalId);
+        currentIntervalPush = moment(); // reset
+        mSensorIntervalId = setInterval(monitorHandler, mIntervalCheck);
+
+        response.status(200);
+        response.send('Done');
+    } catch (err) {
+        response.status(300);
+        response.send('Invalid configure value. Check check again');
+    }
 });
 
 app.post('/', function (request, response) {

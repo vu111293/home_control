@@ -63,72 +63,72 @@ let mDs = new DataServer();
 let mServer = new Server();
 
 
-var mqtt = require('mqtt');
-var client = mqtt.connect('mqtt://ec2.mcommerce.com.vn', {
-    port: 1883
-    // port: 11235,
-    // username: 'cosllpth',
-    // password: 'mDz0FLgPrYJB'
-});
+// var mqtt = require('mqtt');
+// var client = mqtt.connect('mqtt://ec2.mcommerce.com.vn', {
+//     port: 1883
+//     // port: 11235,
+//     // username: 'cosllpth',
+//     // password: 'mDz0FLgPrYJB'
+// });
 
-client.on('connect', function () {
-    client.subscribe('house/sensor/humidity');
-    client.subscribe('house/sensor/temperature');
+// client.on('connect', function () {
+//     client.subscribe('house/sensor/humidity');
+//     client.subscribe('house/sensor/temperature');
 
-    //    client.publish('presence', 'Hello mqtt')
+//     //    client.publish('presence', 'Hello mqtt')
 
-    mqttReady = true;
-})
+//     mqttReady = true;
+// })
 
-client.on('message', function (topic, message) {
-    // message is Buffer
-    console.log(topic + " ->" + message.toString())
-    switch (topic) {
-        case 'house/sensor/temperature':
-            temperature = parseFloat(message);
-            break;
+// client.on('message', function (topic, message) {
+//     // message is Buffer
+//     console.log(topic + " ->" + message.toString())
+//     switch (topic) {
+//         case 'house/sensor/temperature':
+//             temperature = parseFloat(message);
+//             break;
 
-        case 'house/sensor/humidity':
-            humidity = parseFloat(message);
-            break;
+//         case 'house/sensor/humidity':
+//             humidity = parseFloat(message);
+//             break;
 
-        default:
-            break;
-    }
-    // client.end()
-})
+//         default:
+//             break;
+//     }
+//     // client.end()
+// })
 
 
-let mDeltaChanged = 0.3;
-let mIntervalPush = 5 * 60 * 1000;
-let mIntervalCheck = 60 * 1000;
-var currentIntervalPush = moment();
+// let mDeltaChanged = 0.3;
+// let mIntervalPush = 5 * 60 * 1000;
+// let mIntervalCheck = 60 * 1000;
+// var currentIntervalPush = moment();
 
-const monitorHandler = () => {
-    console.log('check ....');
-    let changed = false;
-    if (Math.abs(latestTemp - temperature) > mDeltaChanged) {
-        latestTemp = temperature;
-        changed = true;
-    }
+// const monitorHandler = () => {
+//     console.log('check ....');
+//     let changed = false;
+//     if (Math.abs(latestTemp - temperature) > mDeltaChanged) {
+//         latestTemp = temperature;
+//         changed = true;
+//     }
 
-    if (Math.abs(latestHumidity - humidity) > mDeltaChanged) {
-        latestHumidity = humidity;
-        changed = true;
-    }
+//     if (Math.abs(latestHumidity - humidity) > mDeltaChanged) {
+//         latestHumidity = humidity;
+//         changed = true;
+//     }
 
-    if (changed == true || currentIntervalPush + mIntervalPush < moment()) {
-        if (currentIntervalPush + mIntervalPush < moment()) {
-            currentIntervalPush = moment();
-        }
-        mServer.saveDTH(latestTemp, latestHumidity, (msg) => { console.log(msg); });
-    }
-};
-let mSensorIntervalId = setInterval(monitorHandler, mIntervalCheck);
+//     if (changed == true || currentIntervalPush + mIntervalPush < moment()) {
+//         if (currentIntervalPush + mIntervalPush < moment()) {
+//             currentIntervalPush = moment();
+//         }
+//         mServer.saveDTH(latestTemp, latestHumidity, (msg) => { console.log(msg); });
+//     }
+// };
+// let mSensorIntervalId = setInterval(monitorHandler, mIntervalCheck);
 
-setInterval(function () {
-    https.get("https://home-control-2018.herokuapp.com");
-}, 300000); // every 5 minutes (300000)
+// setInterval(function () {
+//     https.get("https://home-control-2018.herokuapp.com");
+// }, 300000); // every 5 minutes (300000)
 
 
 admin.initializeApp({

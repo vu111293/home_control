@@ -236,13 +236,13 @@ app.post('/', function (request, response) {
     }
 
     function welcome(agent) {
-        agent.add('Marika cafe xin kính chào quý khách!');
-        mDs.buildHome(agent);
+        agent.add('em hôm kính chào quý khách!');
+        // mDs.buildHome(agent);
     }
 
     function fallback(agent) {
         agent.add('Yêu cầu không thể xử lí');
-        agent.add('Xin thử lại với yêu cầu khác');
+        // agent.add('Xin thử lại với yêu cầu khác');
     }
 
     function other(agent) {
@@ -293,9 +293,48 @@ app.post('/', function (request, response) {
     }
 
     function turnDevice(agent, device, action) {
-        client.publish(device.topic, action.value, { qos: 2 }, (err, pack) => {
-        });
-        agent.add('Đã ' + convAction(action.type) + ' ' + device.name);
+        // client.publish(device.topic, action.value, { qos: 2 }, (err, pack) => {
+        // });
+        const googlePayloadJson = {
+            expectUserResponse: true,
+            isSsml: false,
+            noInputPrompts: [],
+            richResponse: {
+                items: [{ simpleResponse: { textToSpeech: 'hello', displayText: 'hi' } }]
+            },
+            systemIntent: {
+                intent: 'actions.intent.OPTION',
+            }
+        }
+        // let payload = new Payload("agent", {
+        //     "facebook": { 
+        //     },
+        //     "kik": {
+        //     },
+        //     "line": {
+        //     },
+        //     "skype": {
+        //     },
+        //     "slack": {
+        //     },
+        //     "telegram": {
+        //     },
+        //     "viber": {
+        //     },
+        //     "marika": {
+        //         "demo": "only for demo"
+        //     }
+        //   });
+        // const payload = new Payload(
+        //         agent.ACTIONS_ON_GOOGLE,
+        //      googlePayloadJson
+        //  );
+
+
+        agent.add(JSON.stringify(googlePayloadJson));
+        // let richResponse = new RichResponse();
+        // richResponse.setPlatform(PLATFORMS.ACTIONS_ON_GOOGLE)
+        // agent.add('Đã ' + convAction(action.type) + ' ' + device.name);
     }
 
     function convAction(action) {
@@ -308,7 +347,7 @@ app.post('/', function (request, response) {
                 break;
 
             default:
-                break;
+                break;  
         }
         return out;
     }

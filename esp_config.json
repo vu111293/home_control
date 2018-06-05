@@ -1,0 +1,13 @@
+{
+    "temperature": {
+        "min": 23.0,
+        "max": 38.0
+    },
+    "humidity": {
+        "min": 60.0,
+        "max": 80.0
+    },
+    "fire_alarm": {
+        "default": 0
+    }
+}

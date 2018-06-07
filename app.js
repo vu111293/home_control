@@ -36,9 +36,6 @@ let mqttReady = false;
 process.env.DEBUG = 'dialogflow:debug'; // enables lib debugging statements
 
 const SLACK_SUPPORT = true;
-const imageUrl = 'https://developers.google.com/actions/images/badges/XPM_BADGING_GoogleAssistant_VER.png';
-const imageUrl2 = 'https://lh3.googleusercontent.com/Nu3a6F80WfixUqf_ec_vgXy_c0-0r4VLJRXjVFF_X_CIilEu8B9fT35qyTEj_PEsKw';
-const linkUrl = 'https://assistant.google.com/';
 
 const LIST_DISPLAY = 'list-display-ui';
 const IMAGE_DISPLAY = 'image-display-ui';
@@ -62,43 +59,131 @@ const TOPPING_MAP = [
 let mDs = new DataServer();
 let mServer = new Server();
 
+const DATA_TOPIC = "IN_MQTT";
+const EVENT_TOPIC = "AN";
 
-// var mqtt = require('mqtt');
-// var client = mqtt.connect('mqtt://ec2.mcommerce.com.vn', {
-//     port: 1883
-//     // port: 11235,
-//     // username: 'cosllpth',
-//     // password: 'mDz0FLgPrYJB'
-// });
+var mqtt = require('mqtt');
+var client = mqtt.connect('mqtt://ec2.mcommerce.com.vn', {
+    port: 1883
+    // port: 11235,
+    // username: 'cosllpth',
+    // password: 'mDz0FLgPrYJB'
+});
 
-// client.on('connect', function () {
-//     client.subscribe('house/sensor/humidity');
-//     client.subscribe('house/sensor/temperature');
+client.on('connect', function () {
+    client.subscribe(DATA_TOPIC);
+    client.subscribe(EVENT_TOPIC);
 
-//     //    client.publish('presence', 'Hello mqtt')
+    //    client.publish('presence', 'Hello mqtt')
+    mqttReady = true;
+    console.log('MQTT ready');
+})
 
-//     mqttReady = true;
-// })
+client.on('message', function (topic, message) {
+    // message is Buffer
+    console.log(topic + " ->" + message.toString())
+    switch (topic) {
+        case DATA_TOPIC:
+            let data = parseIotData(message);
+            if (data) {
+                mServer.saveIotData(data)
+                    .then(r => console.log(r))
+                    .catch(err => console.log(err));
+            }
+            break;
 
-// client.on('message', function (topic, message) {
-//     // message is Buffer
-//     console.log(topic + " ->" + message.toString())
-//     switch (topic) {
-//         case 'house/sensor/temperature':
-//             temperature = parseFloat(message);
-//             break;
+        case EVENT_TOPIC:
+            let event = parseIotEvent(message);
+            if (event) {
+                mServer.saveIotData(event)
+                    .then(r => console.log(r))
+                    .catch(err => console.log(err));
+            }
+            // humidity = parseFloat(message);
+            break;
 
-//         case 'house/sensor/humidity':
-//             humidity = parseFloat(message);
-//             break;
+        default:
+            break;
+    }
+    // client.end()
+})
 
-//         default:
-//             break;
-//     }
-//     // client.end()
-// })
+function parseIotData(raw) {
+    let js = JSON.parse(raw);
 
+    if (js && js.M) {
+        return {
+            mac_address: js.M,
+            temp: js.T == undefined ? "" : js.T,
+            humidity: js.H == undefined ? "" : js.H,
+            input01: js.I[0] == undefined ? "" : js.I[0],
+            input02: js.I[1] == undefined ? "" : js.I[1],
+            input03: js.I[2] == undefined ? "" : js.I[2],
+            input04: js.I[3] == undefined ? "" : js.I[3],
+            output01: js.O[0] == undefined ? "" : js.O[0],
+            output02: js.O[1] == undefined ? "" : js.O[1],
+            p: js.P == undefined ? "" : js.P,
+            c: js.C == undefined ? "" : js.C,
+            alert: js.AN == undefined ? "" : js.AN,
+            time: new Date().getTime()
+        };
+    } else {
+        return null;
+    }
+}
 
+function parseIotEvent(raw) {
+    let js = JSON.parse(raw);
+    if (js && js.M) {
+        let rs = {
+            mac_address: js.M,
+            type: js.E,
+            temp: "",
+            humidity: "",
+            input01: "",
+            input02: "",
+            input03: "",
+            input04: "",
+            output01: "",
+            output02: "",
+            p: "",
+            c: "",
+            alert: "",
+            time: new Date().getTime()
+        };
+
+        switch (js.E) {
+            case 0: // t/h
+                rs.temp = js.T == undefined ? "" : js.T;
+                rs.humidity = js.H == undefined ? "" : js.H;
+                break;
+
+            case 1: // input
+                rs.input01 = js.I[0] == undefined ? "" : js.I[0];
+                rs.input02 = js.I[1] == undefined ? "" : js.I[1];
+                rs.input03 = js.I[2] == undefined ? "" : js.I[2];
+                rs.input04 = js.I[3] == undefined ? "" : js.I[3];
+                break;
+
+            case 2: // output
+                rs.output01 = js.O[0] == undefined ? "" : js.O[0];
+                rs.output02 = js.O[1] == undefined ? "" : js.O[1];
+                break;
+
+            case 3: // alarm
+                rs.alert = js.AN == undefined ? "" : js.AN;
+                break;
+
+            default:
+                rs = null;
+                break;
+        }
+
+        return rs;
+    } else {
+        return null;
+    }
+}
 // let mDeltaChanged = 0.3;
 // let mIntervalPush = 5 * 60 * 1000;
 // let mIntervalCheck = 60 * 1000;
@@ -131,14 +216,14 @@ let mServer = new Server();
 // }, 300000); // every 5 minutes (300000)
 
 
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    databaseURL: conf.FIREBASE_URL
-});
+// admin.initializeApp({
+//     credential: admin.credential.cert(serviceAccount),
+//     databaseURL: conf.FIREBASE_URL
+// });
 
-admin.database().ref('/').on('value', function (postSnapshot) {
-    mDs.parseFromFirebase(postSnapshot);
-});
+// admin.database().ref('/').on('value', function (postSnapshot) {
+//     mDs.parseFromFirebase(postSnapshot);
+// });
 
 let app = express();
 app.set('port', (process.env.PORT || 8080));
@@ -151,51 +236,63 @@ var server = app.listen(app.get('port'), function () {
 });
 
 
-app.get('/config', function (request, response) {
-    response.status(200).send({
-        'checkInterval': mIntervalCheck,
-        'pushInterval': mIntervalPush,
-        'deltaChanged': mDeltaChanged
+app.post('/msconfig', function (request, response) {
+    let topic = request.body.mac + "/config";
+    client.publish(topic, JSON.stringify(request.body), {qos: 1, retain: true}, (e, p) => {
+        if (e) {
+            response.status(500).send('Can not push config');
+        } else {
+            response.status(200).send("Ok");
+        }
     });
 });
 
-app.post('/stopUpdate', function (request, response) {
-    console.log('request stop updated');
-    try {
-        clearInterval(mSensorIntervalId);
-        response.status(200);
-        response.send('Ok');
-    } catch (error) {
-        response.status(300);
-        response.send('Error: ' + error.message);
-    }
-});
 
-app.post('/config', function (request, response) {
-    console.log("check interval: " + request.body.checkInterval);
-    console.log("push interval: " + request.body.pushInterval);
-    console.log("delta changed: " + request.body.deltaChanged);
+// app.get('/config', function (request, response) {
+//     response.status(200).send({
+//         'checkInterval': mIntervalCheck,
+//         'pushInterval': mIntervalPush,
+//         'deltaChanged': mDeltaChanged
+//     });
+// });
 
-    try {
-        let check = parseInt(request.body.checkInterval);
-        let push = parseInt(request.body.pushInterval);
-        let delta = parseFloat(request.body.deltaChanged);
+// app.post('/stopUpdate', function (request, response) {
+//     console.log('request stop updated');
+//     try {
+//         clearInterval(mSensorIntervalId);
+//         response.status(200);
+//         response.send('Ok');
+//     } catch (error) {
+//         response.status(300);
+//         response.send('Error: ' + error.message);
+//     }
+// });
 
-        mIntervalCheck = check;
-        mIntervalPush = push;
-        mDeltaChanged = delta;
+// app.post('/config', function (request, response) {
+//     console.log("check interval: " + request.body.checkInterval);
+//     console.log("push interval: " + request.body.pushInterval);
+//     console.log("delta changed: " + request.body.deltaChanged);
 
-        clearInterval(mSensorIntervalId);
-        currentIntervalPush = moment(); // reset
-        mSensorIntervalId = setInterval(monitorHandler, mIntervalCheck);
+//     try {
+//         let check = parseInt(request.body.checkInterval);
+//         let push = parseInt(request.body.pushInterval);
+//         let delta = parseFloat(request.body.deltaChanged);
 
-        response.status(200);
-        response.send('Done');
-    } catch (err) {
-        response.status(300);
-        response.send('Invalid configure value. Check check again');
-    }
-});
+//         mIntervalCheck = check;
+//         mIntervalPush = push;
+//         mDeltaChanged = delta;
+
+//         clearInterval(mSensorIntervalId);
+//         currentIntervalPush = moment(); // reset
+//         mSensorIntervalId = setInterval(monitorHandler, mIntervalCheck);
+
+//         response.status(200);
+//         response.send('Done');
+//     } catch (err) {
+//         response.status(300);
+//         response.send('Invalid configure value. Check check again');
+//     }
+// });
 
 app.post('/', function (request, response) {
     // console.log('header: ' + JSON.stringify(request.headers));
@@ -293,8 +390,6 @@ app.post('/', function (request, response) {
     }
 
     function turnDevice(agent, device, action) {
-        // client.publish(device.topic, action.value, { qos: 2 }, (err, pack) => {
-        // });
         const googlePayloadJson = {
             expectUserResponse: true,
             isSsml: false,
@@ -306,35 +401,8 @@ app.post('/', function (request, response) {
                 intent: 'actions.intent.OPTION',
             }
         }
-        // let payload = new Payload("agent", {
-        //     "facebook": { 
-        //     },
-        //     "kik": {
-        //     },
-        //     "line": {
-        //     },
-        //     "skype": {
-        //     },
-        //     "slack": {
-        //     },
-        //     "telegram": {
-        //     },
-        //     "viber": {
-        //     },
-        //     "marika": {
-        //         "demo": "only for demo"
-        //     }
-        //   });
-        // const payload = new Payload(
-        //         agent.ACTIONS_ON_GOOGLE,
-        //      googlePayloadJson
-        //  );
-
 
         agent.add(JSON.stringify(googlePayloadJson));
-        // let richResponse = new RichResponse();
-        // richResponse.setPlatform(PLATFORMS.ACTIONS_ON_GOOGLE)
-        // agent.add('Đã ' + convAction(action.type) + ' ' + device.name);
     }
 
     function convAction(action) {
@@ -347,7 +415,7 @@ app.post('/', function (request, response) {
                 break;
 
             default:
-                break;  
+                break;
         }
         return out;
     }
@@ -363,10 +431,10 @@ app.post('/', function (request, response) {
     // help handler
     // intentMap.set('help-request', helpRequest);
 
-    if (agent.requestSource === agent.ACTIONS_ON_GOOGLE) {
-        intentMap.set(null, googleAssistantOther);
-    } else {
-        intentMap.set(null, other);
-    }
+    // if (agent.requestSource === agent.ACTIONS_ON_GOOGLE) {
+    //     intentMap.set(null, googleAssistantOther);
+    // } else {
+    //     intentMap.set(null, other);
+    // }
     agent.handleRequest(intentMap);
 });
